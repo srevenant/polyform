@@ -1,0 +1,9 @@
+
+deps
+_build
+.*.swp
+*.py[cod]
+__pycache__
+pylibs
+.DS_Store
+/**/node_modules

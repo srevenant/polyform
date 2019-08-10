@@ -1,0 +1,13 @@
+#!/bin/bash
+
+dir=~/git/pandim/product/polyform
+
+cd $dir || exit
+
+if [ ! -d p3 ]; then
+    virtualenv -p python3 p3
+fi
+
+source p3/bin/activate
+
+python3 setup.py develop

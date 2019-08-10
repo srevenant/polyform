@@ -1,0 +1,117 @@
+scheme: "1.0"
+
+################################################################################
+meta:
+  owner: Pan Dimensional <du:FA-BC-DE>
+  domain: pandim.example
+  purpose: |-
+    Example Polyform with several sub-forms
+  name: example
+  language: python-3.7
+  market:
+    multiplier: 0
+    cost: 0
+  deploy:
+    stages:
+      - dev
+      - prod
+    aws:
+      # this is your admin access user, stored in ~/.aws/credentials
+      profile: cantilever
+      regions:
+        - us-west-2
+      mode: lambda-regional # lambda-private/ and lambda-edge not currently supported
+      cors-domains: # if this is empty, no cors; otherwise include a list of domains
+
+################################################################################
+# backing datastores
+resources:
+  datastores:
+    backend:
+      role: BackingData
+      driver: aws-dynamo
+      config:
+        private: true # if private=true, bucket name is further scrambled
+        encrypt: basic # basic=kms, strong=internal+kms, none=none
+      schema:
+        TableName: BackingData
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: lane
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: lane
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    # required schema
+    auth-apikeys:
+      role: APIAuthentication
+      driver: aws-dynamo
+      config:
+        private: true
+        encrypt: basic
+      schema:
+        TableName: AuthApikeys
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+  authentication:
+    basic:
+      type: insecure-jwt-apikey
+      datastore: auth-apikeys
+
+################################################################################
+forms:
+  global:
+    authentication: basic
+    type: template
+    dependencies:
+      add:
+      - astroid
+      - datacleaner
+      - pandas
+      - sklearn
+      - xgboost
+      - xgbfir
+    dimensions:
+      expect: |-
+        model = node("BACFAF-1FA14D-89FA") # hardcode the model data node
+      time: latest
+      geoloc: anywhere
+
+  ############################################################################
+  training:
+    extends: global
+    #purpose: |-
+    #  Accept a pre-cleaned/groomed dataset as csv.  This is used to train the model.
+    #  This approach is dated, and although how things are commonly done today, it's
+    #  a way we need to get away from.
+
+    expect: |-
+      requestor |> is(entity($polydev))
+  #    dataFrame = interface->csv |> is("pandas:data_frame")
+    run: $self.$form
+
+  outcome:
+    extends: global
+    run: $self.$form
+
+  ############################################################################
+  test:
+    extends: global
+  #  dependencies:
+  #    add:
+  #    - pylint
+
+# Notes:
+# specialization has a lookup (about a thing) - a node in the universe
+# generalization is a collection (or it becomes a specialization)
+# participants are?

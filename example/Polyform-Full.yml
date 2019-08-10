@@ -1,0 +1,314 @@
+scheme: "1.0"
+
+################################################################################
+meta:
+  owner: Pan Dimensional <du:FA-BC-DE>
+  domain: pandim.example
+  purpose: |-
+    Example Polyform with several sub-forms
+  name: example
+  language: python-3.7
+  market:
+    multiplier: 0
+    cost: 0
+  deploy:
+    stages:
+      - dev
+      - prod
+    aws:
+      # this is your admin access user, stored in ~/.aws/credentials
+      profile: cantilever
+      regions:
+        - us-west-2
+      mode: lambda-regional # lambda-private/ and lambda-edge not currently supported
+      cors-domains: # if this is empty, no cors; otherwise include a list of domains
+    environment:
+      - AWS_PROFILE=cantilever-svc
+
+################################################################################
+# backing datastores
+resources:
+  datastores:
+    # Support AWS: S3, Dynamo, EMR (future: Riak possibly?)
+    s3-p1:
+      role: BackingData
+      driver: aws-s3
+      config:
+        folder: cantilever-p1
+        private: true # if private=true, bucket name is further scrambled
+        encrypt: basic # basic=kms, strong=internal+kms, none=none
+
+    backend:
+      role: BackingData
+      driver: aws-dynamo
+      config:
+        private: true # if private=true, bucket name is further scrambled
+        encrypt: basic # basic=kms, strong=internal+kms, none=none
+      schema:
+        TableName: BackingData
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            AttributeType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    auth-apikeys:
+      role: APIAuthentication
+      driver: aws-dynamo
+      config:
+        private: true
+        encrypt: basic
+      schema:
+        TableName: AuthApikeys
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            AttributeType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+  plasma:
+    driver: riak-ts
+    lifecycle:
+      hot: 1h
+      warm: 24h
+      cold: delete
+
+    # A polyform going beyond this can have a different assertion...
+    # consider: can a sub-form define it's own arc interval?  Probably...
+    # and with a diff lifecycle
+    interval: -1 week to now
+    outer: node |> is:person
+    # these are what are imported -- less is better
+    updates:
+      core-to-plasma: hook datums, buffer 5 mins
+      plasma-to-core: none
+      # or journal eventually consistent
+
+    # catalog..
+    #  `why:` is the purpose where $this is any of the purposes of the polyform
+    #  `as:` is how the data is used, from: real (unencrypted), abstracted(synthetic/homomorphic as appropriate) and ... no other option, perhaps separate the two
+    #  `doc:` is any extra documentable purpose you may want to add
+    catalog: |-
+      # given/full/aliases/etc
+      $invoker->name.* why:"displaying in app"
+      # this why is the default, so is left out of the remaining
+      $invoker->behavior.phone.log why:$this.analyzePhoneLog
+      $invoker->behavior.geoloc.log why:$this
+      $invoker->behavior.geoloc.now why:$this as:socket
+      $invoker->behavior.voice.log why:$this
+      $invoker->behavior.scs.log why:$this
+      $invoker->thing.do why:$this as:call("api")
+      $invoker->behavior.*.log why:$this
+      $invoker->person.name why:$this format:synthetic
+      $invoker->person.health.bloodpressure why:$this format:synthetic
+      $invoker->my.photos.* why:$this as:real doc:"only photos I tag for this app, such as whiteboard snapshots"
+
+    # how to decide what "shard" level the ephemeral db is at
+    combine:
+      attribute: combine = $invoker->"general.locale"->geoloc
+      # TBD: some way to allow Arc to scale up/down the level of detail
+      scale: combine |> geoloc("level-of-detail")
+
+    mapping: |-
+      graph: @node<item>.color
+      index: $invoker->name.first
+
+
+################################################################################
+forms:
+  global:
+    type: template
+    dependencies:
+      add:
+      - astroid
+      - datacleaner
+      - pandas
+      - sklearn
+      - xgboost
+      - xgbfir
+    dimensions:
+      expect: |-
+        model = node("BACFAF-1FA14D-89FA") # hardcode the model data node
+      participants: |-
+        owner = $owner.id # this is implicit, but putting here to be explicit
+      time: latest
+      geoloc: anywhere
+
+  ############################################################################
+  legacy_training:
+    extends: global
+    purpose: |-
+      Accept a pre-cleaned/groomed dataset as csv.  This is used to train the model.
+      This approach is dated, and although how things are commonly done today, it's
+      a way we need to get away from.
+    example (python): |-
+      >>> import polyform
+      >>> pq = polyform.Query("pandim.aurai:performIngressPhoneLog")
+      <Polyform.Query>
+      >>> pq.legacyTraining("a,b,c\n1,2,3\n4,5,6\n")
+      {
+       "version": "1.0",
+       "status": 1,
+       "results": {}
+      }
+    interface: |-
+      csv: String!
+    expect: |-
+      requestor |> is(entity($owner))
+      dataFrame = interface->csv |> is("pandas:data_frame")
+      modelfd = tempfd()
+    run: $self.$form
+    finish: |-
+      push(model.frame, result.frame)
+      result.frame |> is("pandas:data_frame")
+
+  ############################################################################
+  better_training:
+    extends: global
+    purpose: |-
+      First iteration of training, we've determined a list of entities that
+      we put into the data universe, using the updateEntityList form.  This
+      list is curated by us, but references existing entities in the universe.
+    example (python): |-
+      >>> import polyform
+      >>> pq = polyform.Query("perform")
+      <Polyform.Query>
+      >>> pq.better_training("a,b,c\n1,2,3\n4,5,6\n")
+      {
+       "version": "1.0",
+       "status": 1,
+       "results": {}
+      }
+    # accept nothing, as we get the data from within the data universe
+    interface:
+    expect: |-
+      entities = gather(model->entities) # see $perform.updateEntityList
+      debt_to_income = entities |> map(x->debt_to_income)
+      debts = entities |> map(polyform("pandim:debtsLookup"))
+    run: $self.$form
+    finish: model |> push(result->model)
+
+  update_entity_list:
+    extends: global
+    purpose: |-
+      Update a list of entities we want to use for our model.
+    interface: |-
+      entities: [UUID!]
+    expect: entities = each(interface->entities, &lookup!/1)
+    run: false
+    finish:
+
+  ############################################################################
+  is_good_fit: # both the purpose name and the function name
+    extends: global
+    interface: |-
+      person: UDID!
+      requesting: Float!
+      reason: String!
+
+      object Report {
+        status: enum { GREEN RED YELLOW }
+        reason: String
+        explanation: String
+      }
+      # trust, but verify
+      score: Float!
+      report: Report!
+
+#        return {"report": {"status": "GREEN"}, "score": 0.9353}
+#        return {"report": {"status": "YELLOW"}, "score": 0.9353}
+    dimensions:
+      participants:
+        - model = node("BACFAF-1FA14D-89FA")
+        - model = node(interface->modelId)
+        - person = pull(interface->person)
+        - employers = pull(interface->employers) # update to be Lookup employers of person
+        - reason = interface->reason |> as("bagOfWords") # convert here so it can be used at intersect
+      time: latest
+      geoloc: anywhere
+    expect: |-
+      #!DEX async=false
+      model |> is("pandas:data_frame")
+      person |> is("human") |> matching_purpose("requestingThing", reason)
+      employers |> are("employer") |> which("employ", person)
+      employer = employers |> polyform("pandim:employers.primary")
+      employer_stability = primary_employer |> polyform("pandim:employer.stability")
+      employer_employee_count = primary_employer->employees |> count
+      person_fico_check = person |> polyform("fico:score.soft", "cache=24h")
+      person_employment_duration = employer
+      |> polyform("pandim:employer.employee_duration", person)
+      |> as("days")
+      employer_established = employer |> polyform("dnb:established") |> as("posixSeconds")
+      person_age = person->birthday |> as("ageInDays")
+      person_wage = employer |> polyform("pandim:employer.employee_wage", person)
+    run: $self.$form # this is redundant and not necessary
+    finish: |-
+      result->score |> inRange(0.95, 1)
+      person |> push(result->score, as="loanScore") # stores the context of this polyform and the various pandims
+      output->report = result->report
+      output->score = result->score
+
+  ############################################################################
+  ask_for_thing:
+    extends: global
+    type: runtime
+    interface: |-
+      person: UDID!
+      employers: [UDID!]
+      requesting: Float!
+      reason: String!
+      {
+      score: Float!
+      payment_months: Int!
+      suggested_amount: Int!
+    }
+    dimensions:
+      participants:
+        - model = node("BACFAF-1FA14D-89FA")
+        - person = pull(interface->person)
+        - employers = pull(interface->employers)
+        - reason = interface->reason |> as("bagOfWords") # convert here so it can be used at intersect
+    expect: |-
+      patrons |> are("patron") |> which("financiallySupport", person)
+      requestor |> is("underwriter") |> here_for("servicePerson")
+      person |> is(:person) |> why("requestingThing")
+      $all = polyform("self:isThingAGoodFit")
+      $all = polyform("pandim:employer.stability")
+    run: $self.$form
+    finish: |-
+      # did we meet the purpose? - solve for potential
+      result->score |> is("float") |> range(0.95, 1)
+      result->payment_months |> is("int")
+      result->suggested_amount |> is("int")
+      person |> push("recommendation_score")
+      person |> push("payment_months")
+      person |> push("suggested_amount")
+    result: |-
+      output->score = result->score[view=abstract]
+
+  ############################################################################
+  synthetic_ask_for_thing:
+    type: synthetic
+    extends: ask_for_thing
+    interface: |-
+      requestor = "FACFAF-1FA14D-89FA"
+      property = "B0GP8E-0094E5-ED11"
+      employer = "EA9F28-04555A-41D0"
+      reason = "My transmission broke"
+    finish: |-
+      recommendation.score == 0.995555552 # deal with precision problems
+      payment.pace.months == 7
+      suggested.amount[tag:usd] == 50102
+
+  ############################################################################
+  test:
+    extends: global
+
+# Notes:
+# specialization has a lookup (about a thing) - a node in the universe
+# generalization is a collection (or it becomes a specialization)
+# participants are?

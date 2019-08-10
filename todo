@@ -1,0 +1,7 @@
+---- compile each DEX on load (just to verify its good)
+---- inject 'runner' script inside of container to be able to run code by hand (from repl)
+   - cmd that accepts data and keeps it locally?
+   - cmd that runs DE and brings data in to repl
+- rewrite parsing of config
+- auto-version increment on push
+- .polyignore when zipping
