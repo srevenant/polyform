@@ -132,10 +132,18 @@ def dex_eval_locals(defaults):
     #         # return model
     #     raise Exception("serialize(): Unrecognized typedef: " + typedef)
     def dex_convert(data, typedef, *args, **kwargs):
-        if typedef == "json":
+        if typedef == "*>>json":
+            return json.dumps(data)
+        if typedef == "json>>*":
             return json.loads(data)
         if typedef == "csv>>dataframe":
             return pandas.read_csv(StringIO(data))
+        if typedef == "dataframe>>csv":
+            return pandas.DataFrame.to_csv(data)
+        if typedef == "dataframe>>dict":
+            return pandas.DataFrame.to_dict(data)
+        if typedef == "dataframe>>json":
+            return data.to_json()
         if typedef == "dict-row>>dataframe":
 #            out = {key: {"0": value} for key, value in data.items()}
 #            return pandas.read_json(json.dumps(out))
@@ -198,6 +206,7 @@ def dex_intersect(polyform, dex_exprs, mylocals=None):
         row = 0
         for expr in dex_exprs:
             if DEBUG:
+                print(">>> {}".format(mylocals['context']))
                 print(">>> {}".format(expr))
             row += 1
             # lift context up into primary locals

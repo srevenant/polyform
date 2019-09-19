@@ -435,7 +435,7 @@ class PolyformCli():
             shutil.rmtree(deps_target)
         osu.needs_folder(deps_target)
 
-        base = os.path.dirname(__file__)
+        base = os.path.dirname(os.path.dirname(__file__))
         srclen = len(base) + 1
 
         for root, dirname, files in os.walk(base):

@@ -9,6 +9,7 @@ build and manage our layers, testing, and development.
 
 #import os
 import json
+import dictlib
 from dictlib import Dict #, dug
 from .reflex_arc import dex_intersect, DEXError
 from ..gql import validate as gql_validate
@@ -66,6 +67,8 @@ class PolyformDecorator():
                 raise DataExpectationFailed("function returned a non Result() object")
             return self.finish(context, result)
         except DEXError as err:
+            import traceback
+            print(traceback.format_exc())
             raise DataExpectationFailed(err.message)
 
     def gather(self, *args, **kwargs):
@@ -124,10 +127,10 @@ class aws_lambda_polyform(PolyformDecorator):
             print("==> No interface.Input definition, not processing input data")
         else:
             body = event.get('parsed_body')
-            print(body)
             if not body:
-                body = event.get('body')
-                print(body)
+               body = event.get('body')
+            if body is None:
+                raise DataExpectationFailed("no payload")
             mylocals.context.interface.input = gql_validate.validate(
                 self._interface,
                 'Input',
@@ -158,21 +161,21 @@ class aws_lambda_polyform(PolyformDecorator):
             if context.interface.output:
                 print("{}".format(context.interface.output))
             return {}
-        return gql_validate.validate(self._interface, 'Output', context.interface.output)
+        return gql_validate.validate(self._interface, 'Output', dictlib.export(context.interface.output))
 
-def export(dict1):
-    """
-    Walk `dict1` which may be mixed dict()/Dict() and export any Dict()'s to dict()
-
-    >>> export(Dict(first=1, second=dict(tres=Dict(nachos=2))))
-    {'first': 1, 'second': {'tres': {'nachos': 2}}}
-    """
-    for key, value in dict1.items():
-        if isinstance(value, Dict):
-            dict1[key] = value.__export__()
-        elif isinstance(value, dict):
-            dict1[key] = export(value)
-    return dict1
+# def export(dict1):
+#     """
+#     Walk `dict1` which may be mixed dict()/Dict() and export any Dict()'s to dict()
+#
+#     >>> export(Dict(first=1, second=dict(tres=Dict(nachos=2))))
+#     {'first': 1, 'second': {'tres': {'nachos': 2}}}
+#     """
+#     for key, value in dict1.items():
+#         if isinstance(value, Dict):
+#             dict1[key] = value.__export__()
+#         elif isinstance(value, dict):
+#             dict1[key] = export(value)
+#     return dict1
 
 # pylint: disable=unused-argument
 #def is_polyform(func):

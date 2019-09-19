@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#tom !/usr/bin/env python3
 # vim:set expandtab ts=4 sw=4 ai ft=python:
 """
 Copyright 2019 Brandon Gillespie; All rights reserved.
@@ -36,6 +36,6 @@ def prep_aws_environ():
             val = os.environ[key]
             if val in ('SOME_ACCESS_KEY_ID', 'SOME_SECRET_ACCESS_KEY'):
                 del os.environ[key]
-    for key in ('AWS_PROFILE',):
-        if key not in os.environ:
-            raise AttributeError(key + " is not set in environment")
+#    for key in ('AWS_PROFILE',):
+#        if key not in os.environ:
+#            raise AttributeError(key + " is not set in environment")

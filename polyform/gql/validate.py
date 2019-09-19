@@ -34,9 +34,14 @@ class CheckTypes():
     def validate(self, typedef, data, ref=None):
         """Entry point"""
 #        print(">>> CheckTypes.validate({},{})".format(typedef, data))
+        #print("??? TYPEDEF={}".format(typedef))
         #print("... {}".format(self.schema[typedef]))
         #print("---{}".format(self.schema[typedef]))
-        fields = self.schema[typedef].get('fields')
+        try:
+            fields = self.schema[typedef].get('fields')
+        except KeyError as error:
+            msg = "specified data type `{}` is not valid for key `{}`".format(typedef, ref)
+            raise DataValidationError(msg)
         if not fields:
             call = self.schema[typedef].get('call')
             if call:
@@ -47,17 +52,17 @@ class CheckTypes():
         new = dict()
         remainder = data.copy()
         for key in fields:
-            #print("FIELDS={}".format(fields))
+#            print("FIELDS={}".format(fields))
             # each col defined on type
-            #print("key={}.{}".format(typedef, key))
+#            print("key={}.{}".format(typedef, key))
             spec = fields[key]
             val = data.get(key)
-            #print("VAL?=>{}".format(val))
+#            print("VAL?=>{}".format(val))
             if val is None:
                 if spec['nullok']:
 #                    #print("Null OK for {}".format(key))
                     continue
-                raise DataValidationError("key `{}` missing from `{}`".format(key, typedef))
+                raise DataValidationError("key `{}` missing or not matching type, from payload (type=`{}`)".format(key, typedef))
 
             call = spec.get('call')
             if call:
