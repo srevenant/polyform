@@ -29,11 +29,13 @@ import jwt
 import datacleaner
 import pandas
 import dictlib
+from .logger import log
 from dictlib import Dict
 from .dynamo_min import DynamoMin
 from .s3_min import S3Min
 
 DEBUG = not not os.environ.get('DEBUG') # pylint: disable=unneeded-not
+LOGDATA = not not os.environ.get('LOGDATA') # pylint: disable=unneeded-not
 
 # setting message this way isn't translating into __repr__ properly, need
 # to spend a few mins and figure out how to propagate the message properly
@@ -72,7 +74,8 @@ def dex_eval_locals(defaults):
         return value
     def dex_pull(duid, typedef=None):
         ## TEMPORARY
-        print("PULL({})".format(duid))
+        if LOGDATA:
+            log(type="data", pull="{}".format(duid))
         if typedef == 'pickle>>*':
             with tempfile.TemporaryFile() as wfd:
                 rfd = BDATA.get(key=duid)
@@ -90,7 +93,8 @@ def dex_eval_locals(defaults):
     def dex_push(data, duid, typedef=None):
         if isinstance(data, Dict):
             data = data.__export__()
-        print("PUSH({})".format(duid))
+        if LOGDATA:
+            log(type="data", push="{}".format(duid))
         if typedef == '*>>pickle':
             with tempfile.TemporaryFile() as xfd:
                 pickle.dump(data, xfd)
@@ -160,10 +164,8 @@ def dex_eval_locals(defaults):
         # if typedef == "txt>>b64gz":
         #     return zlib.decompress(base64.b64decode(data)).decode()
         raise Exception("convert(): Unrecognized typedef: " + typedef)
-    def dex_inspect(data, label=None):
-        if label:
-            sys.stdout.write("{}: ".format(label))
-        sys.stdout.write("{}\n".format(data))
+    def dex_inspect(data, **kwargs):
+        log(inspect="{}".format(data), **kwargs)
         return data
 
     if defaults:
@@ -270,7 +272,7 @@ def verify_access_token(token):
     except (jwt.exceptions.DecodeError, jwt.exceptions.ExpiredSignatureError) as err:
        # print("Auth Error: " + str(err))
         raise AuthFailed("Auth Error: " + str(err))
-    except: # pylint: disable=bare-except
+    except Exception as err: # pylint: disable=bare-except
         # watch logs, trim this over time
         traceback.print_exc()
         raise AuthFailed("Auth Error: " + str(err))

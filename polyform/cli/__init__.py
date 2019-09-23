@@ -114,8 +114,8 @@ class PolyformCli():
 
         try:
             self.args.func()
-            if os.path.exists("src/_polyform.json"):
-                os.unlink("src/_polyform.json")
+#            if os.path.exists("src/_polyform.json"):
+#                os.unlink("src/_polyform.json")
         except KeyboardInterrupt:
             return
 

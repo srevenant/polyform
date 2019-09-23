@@ -7,13 +7,17 @@ Inception - running functions inside the container from outside, to help
 build and manage our layers, testing, and development.
 """
 
-#import os
+import os
 import json
 import dictlib
 from dictlib import Dict #, dug
 from .reflex_arc import dex_intersect, DEXError
+from .logger import log
 from ..gql import validate as gql_validate
+from uuid import uuid4
 #from . import reflex_arc
+
+LOGDATA = not not os.environ.get('LOGDATA') # pylint: disable=unneeded-not
 
 # for now just use Dict, eventually make this a class that sls methods can return
 Result = Dict
@@ -39,8 +43,10 @@ class PolyformDecorator():
     _cfg = None
     _form = None
     _interface = None
+    reqid = None
 
     def __init__(self, func, *args, **kwargs): # pylint: disable=unused-argument
+        self.reqid = str(uuid4())
         self._func = func
         self._interface = Dict(event=None, biome=None)
         self.dims = Dict(model=dict(trained=None, csv=None))
@@ -60,8 +66,9 @@ class PolyformDecorator():
                 self._cfg = Dict(json.load(infile))
             # TODO NEXT: AUTHENTICATE
 
+            log(type="exec", msg="Starting Gather")
             context = self.gather(*args, **kwargs)
-            print("==> Calling Function")
+            log(type="exec", msg="Starting Function")
             result = self._func(context=context, dims=self.dims)
             if not isinstance(result, Result):
                 raise DataExpectationFailed("function returned a non Result() object")
@@ -75,7 +82,6 @@ class PolyformDecorator():
         """
         future: this will pull in from the core
         """
-        print("==> Starting DEX Gather")
 
         self._form = self._cfg.forms[self._cfg.target]
         self._interface = self._form.interface
@@ -97,8 +103,9 @@ class PolyformDecorator():
         """
         After a polyform is completed.
         """
-        print("==> Starting DEX Finish")
-        return getattr(self, 'finish_' + self.faas)(context, result)
+        log(type="exec", msg="Starting Finish")
+        result = getattr(self, 'finish_' + self.faas)(context, result)
+        log(type="exec", msg="Function Finished")
 
 # pylint: disable=invalid-name
 class aws_lambda_polyform(PolyformDecorator):
@@ -124,18 +131,22 @@ class aws_lambda_polyform(PolyformDecorator):
         )
 
         if not self._interface or not self._interface.get('Input'):
-            print("==> No interface.Input definition, not processing input data")
+            log(type="warning", msg="No interface.Input definition, not processing input data")
         else:
             body = event.get('parsed_body')
             if not body:
                body = event.get('body')
             if body is None:
                 raise DataExpectationFailed("no payload")
+            if LOGDATA:
+                log(type="data", preExpect=json.dumps(body))
             mylocals.context.interface.input = gql_validate.validate(
                 self._interface,
                 'Input',
                 body
             )
+            if LOGDATA:
+                log(type="data", postExpect=json.dumps(body))
 
         # should check headers and give better errors, but assume its json
         return dex_intersect(self._cfg, self._form.expect, mylocals=mylocals)
@@ -157,11 +168,16 @@ class aws_lambda_polyform(PolyformDecorator):
             context.interface.output = result
 
         if not self._interface or not self._interface.get('Output'):
-            print("==> No interface.Output definition, not processing output data:")
+            log(type="warning", msg="No interface.Output definition, not processing output data:")
             if context.interface.output:
                 print("{}".format(context.interface.output))
             return {}
-        return gql_validate.validate(self._interface, 'Output', dictlib.export(context.interface.output))
+        result = gql_validate.validate(self._interface, 'Output', dictlib.export(context.interface.output))
+        # TODO: Make this pivot off a config on the polyform
+        if LOGDATA:
+            log(type="data", response=json.dumps(result))
+        # print("result: {}".format(result))
+        return result
 
 # def export(dict1):
 #     """

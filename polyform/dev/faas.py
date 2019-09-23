@@ -66,7 +66,7 @@ class Docker():
             self._run['mnts'] = dict() # keep this one a dict
             self._opts = Dict(cache=cache, cleanup=True)
             self._env = dict()
-        for key in ('POLYTEST', 'DEBUG', 'AWS_PROFILE', 'AWS_DEFAULT_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'):
+        for key in ('POLYTEST', 'LOGDATA', 'DEBUG', 'AWS_PROFILE', 'AWS_DEFAULT_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'):
             if os.environ.get(key):
                 self._env[key] = os.environ.get(key)
         if not self._opts.cache:
