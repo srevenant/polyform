@@ -11,7 +11,7 @@ setup(
       'polyform.cli',
       'polyform.dev',
       'polyform.gql',
-      'polyform.provider'
+      'polyform.provider',
       'polyform.sls',
       'polyform.util',
     ],
