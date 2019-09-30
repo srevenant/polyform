@@ -20,7 +20,7 @@ setup(
     author='Brandon Gillespie',
     install_requires=[
       'dictlib',
-      'pyyaml',
+      'pyyaml>=5',
       'pylint',
       'pyjwt',
       'boto3', # can move this to a plugin in the future
