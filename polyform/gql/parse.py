@@ -11,7 +11,7 @@ the python/graphql library
 """
 
 import graphql
-from graphql.language.ast import ObjectTypeDefinitionNode, NonNullTypeNode
+from graphql.language.ast import ObjectTypeDefinition, NonNullType
 # pylint: disable=unused-import
 from graphql.error.syntax_error import GraphQLSyntaxError
 from dictlib import Dict
@@ -44,12 +44,12 @@ def interface(indata):
     )
     #for doc in graphql.parse(indata).definintions:
     for doc in parsed.definitions:
-        if isinstance(doc, ObjectTypeDefinitionNode):
+        if isinstance(doc, ObjectTypeDefinition):
             fields = Dict()
             for field in doc.fields:
                 newfield = Dict(nullok=True)
                 ftype = field.type
-                if isinstance(ftype, NonNullTypeNode):
+                if isinstance(ftype, NonNullType):
                     newfield.nullok = False
                     ftype = ftype.type
                 newfield.type = ftype.name.value
