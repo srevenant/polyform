@@ -5,7 +5,7 @@ import setuptools
 
 setup(
     name='polyform',
-    version='0.2.6',
+    version='0.2.7',
     packages=[
       'polyform',
       'polyform.cli',
