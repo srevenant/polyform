@@ -24,7 +24,7 @@ setup(
       'pylint',
       'pyjwt',
       'boto3', # can move this to a plugin in the future
-      'graphene>=2'
+      'graphene>=2,<3'
     ],
     entry_points = {
       'console_scripts': [
