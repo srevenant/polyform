@@ -106,6 +106,7 @@ class PolyformDecorator():
         log(type="exec", msg="Starting Finish")
         result = getattr(self, 'finish_' + self.faas)(context, result)
         log(type="exec", msg="Function Finished")
+        return result
 
 # pylint: disable=invalid-name
 class aws_lambda_polyform(PolyformDecorator):

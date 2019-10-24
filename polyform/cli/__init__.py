@@ -400,6 +400,7 @@ class PolyformCli():
                 print("\nProfile `{}` does not exist in ~/.aws/credentials!\n\nTry one of: {}"
                       .format(val, ", ".join(profiles)))
                 val = ''
+        print("VAL={}".format(val))
         self.base.aws.profile = val
         default = self.base.aws.region
         val = ''

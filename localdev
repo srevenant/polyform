@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dir=~/git/pandim/product/polyform
+dir=~brandon/git/pandim/product/polyform
 
 cd $dir || exit
 

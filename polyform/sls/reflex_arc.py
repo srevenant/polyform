@@ -60,7 +60,7 @@ class DEXError(Exception):
             self.message += json.dumps(error.__class__.__name__ + ": " + str(error))
 
 # TODO: remove hardwired name
-BDATA = S3Min(schema=dict(Bucket='4E5DDD33F59A4D4086756BA77698213D'))
+S3BUCKET = S3Min(schema=dict(Bucket='4E5DDD33F59A4D4086756BA77698213D'))
 def dex_eval_locals(defaults):
     """
     create our eval locals
@@ -78,17 +78,17 @@ def dex_eval_locals(defaults):
             log(type="data", pull="{}".format(duid))
         if typedef == 'pickle>>*':
             with tempfile.TemporaryFile() as wfd:
-                rfd = BDATA.get(key=duid)
+                rfd = S3BUCKET.get(key=duid)
                 while wfd.write(rfd.read(amt=4096)):
                     pass
                 wfd.seek(0)
                 return pickle.load(wfd)
         if typedef == 'json':
-            return json.load(BDATA.get(key=duid))
+            return json.load(S3BUCKET.get(key=duid))
         if typedef == 'csv>>dataframe':
-            return pandas.read_csv(BDATA.get(key=duid))
+            return pandas.read_csv(S3BUCKET.get(key=duid))
         if typedef is None:
-            return BDATA.get(key=duid).read()
+            return S3BUCKET.get(key=duid).read()
         raise Exception("pull(): Unrecognized typedef: " + typedef)
     def dex_push(data, duid, typedef=None):
         if isinstance(data, Dict):
@@ -99,9 +99,9 @@ def dex_eval_locals(defaults):
             with tempfile.TemporaryFile() as xfd:
                 pickle.dump(data, xfd)
                 xfd.seek(0)
-                return BDATA.put(key=duid, file=xfd)
+                return S3BUCKET.put(key=duid, file=xfd)
         if typedef is None:
-            return BDATA.put(key=duid, body=data)
+            return S3BUCKET.put(key=duid, body=data)
         raise Exception("push(): Unrecognized typedef: " + typedef)
     def dex_follow(node, key):
         raise Exception("Not yet implemented")
