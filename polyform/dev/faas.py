@@ -347,7 +347,8 @@ def export_polyconfig(poly, form):
     config['forms'][form] = fobj
     rds = config['resources']['datastores']
     for name in rds:
-        for key in list(rds[name].keys()):
-            if key not in ('role', 'driver', 'config'):
-                del rds[name][key]
+        if isinstance(rds[name], dict):
+            for key in list(rds[name].keys()):
+                if key not in ('role', 'driver', 'config'):
+                    del rds[name][key]
     return config

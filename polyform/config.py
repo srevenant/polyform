@@ -13,6 +13,7 @@ import os
 import re
 import json
 import copy
+import shlex
 from functools import singledispatch
 import dictlib
 from dictlib import Obj as Dict
@@ -129,6 +130,7 @@ class ParseObj():
     _items = None
     _required = {}
     _skel = {}
+    _lane = 'dev'
 
     def __init__(self, parent=None, keyword='', **kwargs):
         if parent != self:
@@ -138,11 +140,12 @@ class ParseObj():
         elif isinstance(self._items, list):
             self._items = set(self._items)
         self._key_rx = re.compile(r'^[A-Za-z0-9+]+$')
-        self._key_arg_rx = re.compile(r'^([A-Za-z0-9+]+)\s*\(([A-Za-z0-9-]+)\)$')
+        self._key_arg_rx = re.compile(r'^([A-Za-z0-9+]+)\s*\(([ =A-Za-z0-9-]+)\)$')
         if parent:
             self._parent = parent._parent + "." + keyword # pylint: disable=protected-access
         else:
             self._parent = keyword
+        self._lane = os.environ.get('POLY_ENV', 'dev')
 
     def _skeleton(self):
         #print("SKEL {}".format(self._skel))
@@ -202,11 +205,14 @@ class ParseObj():
     def _add_key(self, key, value):
         """Add element as a key/value"""
         keyarg = False
+        str = key
         if not self._key_rx.match(key):
             match = self._key_arg_rx.match(key)
             if match:
                 key = match.group(1)
-                keyarg = match.group(2)
+                keyarg = dict(token.split('=', 1) for token in shlex.split(match.group(2)))
+                if keyarg.get('lane', 'dev') != self._lane:
+                    return self
             else:
                 abort("Invalid keyword at {}.{}", self._parent, key)
 
@@ -293,7 +299,7 @@ class Test(ParseObj):
     def _parse_input(self, key, value):
         return self._is_type(key, value, dict)
 
-    def _parse_expect(self, key, value):
+    def _parse_expect(self, key, value, arg=None):
         return dex_transpile(value)
 
 ################################################################################
@@ -330,7 +336,7 @@ class Dimensions(ParseObj):
     def _parse_finish(self, key, value):
         return dex_transpile(value)
     # this is for globals
-    def _parse_expect(self, key, value):
+    def _parse_expect(self, key, value, arg=None):
         return dex_transpile(value)
 
 
@@ -418,18 +424,11 @@ class Form(ParseObj):
     def _parse_authentication(self, key, value):
         return self._is_type(key, value, str, none=True)
 
-    def _parse_expect(self, key, value):
-        # TODO: verify DES
+    def _parse_expect(self, key, value, arg=None):
         return dex_transpile(value)
 
     def _parse_finish(self, key, value):
-        # TODO: verify DES
         return dex_transpile(value)
-        #return self._is_type(key, value, str, none=True)
-
-#    def _parse_result(self, key, value):
-#        # TODO: verify DES to GraphQL
-#        return self._is_type(key, value, str, none=True)
 
     def _parse_interface(self, key, value):
         if not value:
@@ -507,6 +506,7 @@ class Meta(ParseObj):
         'owner': '',
         'name': '',
         'domain': '',
+        'lanes': '',
         'purpose': '',
         'deploy': dict(),
         'language':  'python-3.7',
@@ -529,6 +529,10 @@ class Meta(ParseObj):
         value = self._is_type(key, value, str)
         if re.search(r'[^a-z0-9_.]', value):
             self._error("{} may only contain a-z 0-9 _ and .", key)
+        return value
+
+    def _parse_lanes(self, key, value):
+        value = self._is_type(key, value, list)
         return value
 
     def _parse_domain(self, key, value):
@@ -668,8 +672,8 @@ class Polyform(ParseObj):
 #        return value
 
     def _parse_scheme(self, key, value):
-        if value != "1.0":
-            self._error("scheme is not 1.0", type)
+        if value != "1.1":
+            self._error("scheme is not 1.1", type)
         return value
 
 #    def _parse_owner(self, key, value):
